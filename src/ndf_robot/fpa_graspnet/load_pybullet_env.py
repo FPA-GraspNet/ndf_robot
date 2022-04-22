@@ -16,7 +16,7 @@ from ndf_robot.utils import util, trimesh_util
 from ndf_robot.share.globals import bad_shapenet_mug_ids_list, bad_shapenet_bowls_ids_list, bad_shapenet_bottles_ids_list
 from ndf_robot.robot.multicam import MultiCams
 from ndf_robot.utils.eval_gen_utils import (
-    soft_grasp_close, constraint_grasp_close, constraint_obj_world, constraint_grasp_open, 
+    soft_grasp_close, constraint_grasp_close, constraint_obj_world, constraint_grasp_open,
     safeCollisionFilterPair, object_is_still_grasped, get_ee_offset, post_process_grasp_point,
     process_demo_data_rack, process_demo_data_shelf, process_xq_data, process_xq_rs_data, safeRemoveConstraint,
 )
@@ -51,9 +51,9 @@ obj_config_name = osp.join(path_util.get_ndf_config(), "mug" + '_obj_cfg.yaml')
 obj_cfg.merge_from_file(obj_config_name)
 obj_cfg.freeze()
 
-shapenet_obj_dir = '/home/shruthi/Project/ndf_robot/src/ndf_robot/descriptions/objects/mug_centered_obj_normalized'
+shapenet_obj_dir = '/home/shruthi/Workspace/ndf_robot/src/ndf_robot/descriptions/objects/mug_centered_obj_normalized'
 obj_class = "mug"
-eval_save_dir = '/home/shruthi/Project/ndf_robot/src/ndf_robot/eval_data/eval_data/exp--test_mug_eval_model--multi_category_weights_seed--0'
+eval_save_dir = '/home/shruthi/Workspace/ndf_robot/src/ndf_robot/eval_data/eval_data/exp--test_mug_eval_model--multi_category_weights_seed--0'
 
 eval_grasp_imgs_dir = osp.join(eval_save_dir, 'grasp_imgs')
 eval_teleport_imgs_dir = osp.join(eval_save_dir, 'teleport_imgs')
@@ -66,7 +66,7 @@ if obj_class == 'mug':
 elif obj_class == 'bowl':
     avoid_shapenet_ids = bad_shapenet_bowls_ids_list + cfg.BOWL.AVOID_SHAPENET_IDS
 elif obj_class == 'bottle':
-    avoid_shapenet_ids = bad_shapenet_bottles_ids_list + cfg.BOTTLE.AVOID_SHAPENET_IDS 
+    avoid_shapenet_ids = bad_shapenet_bottles_ids_list + cfg.BOTTLE.AVOID_SHAPENET_IDS
 else:
     test_shapenet_ids = []
 
@@ -106,7 +106,7 @@ for s_id in shapenet_id_list:
     valid = s_id not in demo_shapenet_ids and s_id not in avoid_shapenet_ids
     if only_test_ids:
         valid = valid and (s_id in test_shapenet_ids)
-    
+
     if valid:
         test_object_ids.append(s_id)
 
@@ -127,7 +127,7 @@ for cam in cams.cams:
 
 # put table at right spot
 table_ori = euler2quat([0, 0, np.pi / 2])
-table_urdf ='/home/shruthi/Project/ndf_robot/pybullet-planning/models/franka_description/robots/panda_arm_hand.urdf'
+table_urdf ='/home/shruthi/Workspace/ndf_robot/pybullet-planning/models/franka_description/robots/panda_arm_hand.urdf'
 # this is the URDF that was used in the demos -- make sure we load an identical one
 tmp_urdf_fname = osp.join(path_util.get_ndf_descriptions(), 'hanging/table/table_rack_tmp.urdf')
 # open(tmp_urdf_fname, 'w').write(table_urdf)
@@ -147,7 +147,7 @@ elif obj_class in ['bowl', 'bottle']:
 if cfg.DEMOS.PLACEMENT_SURFACE == 'shelf':
     placement_link_id = shelf_link_id
 else:
-    placement_link_id = rack_link_id 
+    placement_link_id = rack_link_id
 
 def show_link(obj_id, link_id, color):
         if link_id is not None:
@@ -181,11 +181,11 @@ for i in range(p.getNumJoints(robot.arm.robot_id)):
     safeCollisionFilterPair(bodyUniqueIdA=robot.arm.robot_id, bodyUniqueIdB=table_id, linkIndexA=i, linkIndexB=-1, enableCollision=False, physicsClientId=robot.pb_client.get_client_id())
     safeCollisionFilterPair(bodyUniqueIdA=robot.arm.robot_id, bodyUniqueIdB=obj_id, linkIndexA=i, linkIndexB=-1, enableCollision=False, physicsClientId=robot.pb_client.get_client_id())
 
-for i in range(10):
-    print(i)
+for i in range(10000):
+    # print(i)
     p.stepSimulation()
     time.sleep(1./240.)
     # robot.arm.move_ee_xyz([0, 0, 0.2])
     robot.arm.go_home(ignore_physics=True)
-    
+
 p.disconnect()

@@ -27,7 +27,7 @@ from ndf_robot.utils import path_util
 from ndf_robot.share.globals import bad_shapenet_mug_ids_list, bad_shapenet_bowls_ids_list, bad_shapenet_bottles_ids_list
 from ndf_robot.utils.franka_ik import FrankaIK
 from ndf_robot.utils.eval_gen_utils import (
-    soft_grasp_close, constraint_grasp_close, constraint_obj_world, constraint_grasp_open, 
+    soft_grasp_close, constraint_grasp_close, constraint_obj_world, constraint_grasp_open,
     safeCollisionFilterPair, object_is_still_grasped, get_ee_offset, post_process_grasp_point,
     process_demo_data_rack, process_demo_data_shelf, process_xq_data, process_xq_rs_data, safeRemoveConstraint,
 )
@@ -79,7 +79,7 @@ def main(args, global_dict):
     elif obj_class == 'bowl':
         avoid_shapenet_ids = bad_shapenet_bowls_ids_list + cfg.BOWL.AVOID_SHAPENET_IDS
     elif obj_class == 'bottle':
-        avoid_shapenet_ids = bad_shapenet_bottles_ids_list + cfg.BOTTLE.AVOID_SHAPENET_IDS 
+        avoid_shapenet_ids = bad_shapenet_bottles_ids_list + cfg.BOTTLE.AVOID_SHAPENET_IDS
     else:
         test_shapenet_ids = []
 
@@ -99,16 +99,16 @@ def main(args, global_dict):
 
     if args.dgcnn:
         model = vnn_occupancy_network.VNNOccNet(
-            latent_dim=256, 
+            latent_dim=256,
             model_type='dgcnn',
-            return_features=True, 
+            return_features=True,
             sigmoid=True,
             acts=args.acts).cuda()
     else:
         model = vnn_occupancy_network.VNNOccNet(
-            latent_dim=256, 
+            latent_dim=256,
             model_type='pointnet',
-            return_features=True, 
+            return_features=True,
             sigmoid=True).cuda()
 
     if not args.random:
@@ -201,7 +201,7 @@ def main(args, global_dict):
                 place_optimizer_pts = shelf_optimizer_gripper_pts
                 place_optimizer_pts_rs = shelf_optimizer_gripper_pts_rs
             else:
-                print('Using rack points') #2000x3 shape 
+                print('Using rack points') #2000x3 shape
                 place_optimizer_pts = rack_optimizer_gripper_pts
                 place_optimizer_pts_rs = rack_optimizer_gripper_pts_rs
 
@@ -237,7 +237,7 @@ def main(args, global_dict):
         valid = s_id not in demo_shapenet_ids and s_id not in avoid_shapenet_ids
         if args.only_test_ids:
             valid = valid and (s_id in test_shapenet_ids)
-        
+
         if valid:
             test_object_ids.append(s_id)
 
@@ -281,12 +281,12 @@ def main(args, global_dict):
     if cfg.DEMOS.PLACEMENT_SURFACE == 'shelf':
         placement_link_id = shelf_link_id
     else:
-        placement_link_id = rack_link_id 
+        placement_link_id = rack_link_id
 
-    def hide_link(obj_id, link_id): 
+    def hide_link(obj_id, link_id):
         if link_id is not None:
             p.changeVisualShape(obj_id, link_id, rgbaColor=[0, 0, 0, 0])
-    
+
     def show_link(obj_id, link_id, color):
         if link_id is not None:
             p.changeVisualShape(obj_id, link_id, rgbaColor=color)
@@ -310,7 +310,7 @@ def main(args, global_dict):
         # for testing, use the "normalized" object
         obj_obj_file = osp.join(shapenet_obj_dir, obj_shapenet_id, 'models/model_normalized.obj')
         obj_obj_file_dec = obj_obj_file.split('.obj')[0] + '_dec.obj'
-    
+
         scale_high, scale_low = cfg.MESH_SCALE_HIGH, cfg.MESH_SCALE_LOW
         scale_default = cfg.MESH_SCALE_DEFAULT
         if args.rand_mesh_scale:
@@ -413,7 +413,7 @@ def main(args, global_dict):
         obj_pose_world = p.getBasePositionAndOrientation(obj_id)
         obj_pose_world = util.list2pose_stamped(list(obj_pose_world[0]) + list(obj_pose_world[1]))
         viz_dict['start_obj_pose'] = util.pose_stamped2list(obj_pose_world)
-        for i, cam in enumerate(cams.cams): 
+        for i, cam in enumerate(cams.cams):
             # get image and raw point cloud
             rgb, depth, seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
             pts_raw, _ = cam.get_pcd(in_world=True, rgb_image=rgb, depth_image=depth, depth_min=0.0, depth_max=np.inf)
@@ -423,10 +423,10 @@ def main(args, global_dict):
             flat_depth = depth.flatten()
             obj_inds = np.where(flat_seg == obj_id)
             table_inds = np.where(flat_seg == table_id)
-            seg_depth = flat_depth[obj_inds[0]]  
-            
+            seg_depth = flat_depth[obj_inds[0]]
+
             obj_pts = pts_raw[obj_inds[0], :]
-            obj_pcd_pts.append(util.crop_pcd(obj_pts))
+            obj_pcd_pts.append(util.crop_pcd(obj_pts)) # confirm what the limits mean
             table_pts = pts_raw[table_inds[0], :][::int(table_inds[0].shape[0]/500)]
             table_pcd_pts.append(table_pts)
 
@@ -436,15 +436,15 @@ def main(args, global_dict):
                 if rack_inds[0].shape[0] > 0:
                     rack_pts = pts_raw[rack_inds[0], :]
                     rack_pcd_pts.append(rack_pts)
-        
+
             depth_imgs.append(seg_depth)
             seg_idxs.append(obj_inds)
-        
+
         target_obj_pcd_obs = np.concatenate(obj_pcd_pts, axis=0)  # object shape point cloud
         target_pts_mean = np.mean(target_obj_pcd_obs, axis=0)
         inliers = np.where(np.linalg.norm(target_obj_pcd_obs - target_pts_mean, 2, 1) < 0.2)[0]
         target_obj_pcd_obs = target_obj_pcd_obs[inliers]
-        
+
         if obj_class == 'mug':
             rack_color = p.getVisualShapeData(table_id)[rack_link_id][7]
             show_link(table_id, rack_link_id, rack_color)
@@ -474,7 +474,7 @@ def main(args, global_dict):
 
         ee_end_pose = util.transform_pose(pose_source=util.list2pose_stamped(pre_grasp_ee_pose), pose_transform=util.list2pose_stamped(rack_relative_pose))
         pre_ee_end_pose2 = util.transform_pose(pose_source=ee_end_pose, pose_transform=preplace_offset_tf)
-        pre_ee_end_pose1 = util.transform_pose(pose_source=pre_ee_end_pose2, pose_transform=preplace_horizontal_tf)        
+        pre_ee_end_pose1 = util.transform_pose(pose_source=pre_ee_end_pose2, pose_transform=preplace_horizontal_tf)
 
         ee_end_pose_list = util.pose_stamped2list(ee_end_pose)
         pre_ee_end_pose1_list = util.pose_stamped2list(pre_ee_end_pose1)
@@ -509,7 +509,7 @@ def main(args, global_dict):
                 else:
                     if viz_index == best_rack_idx:
                         shutil.copy(fname, new_fname)
-        
+
         viz_data_list.append(viz_dict)
         viz_sample_fname = osp.join(eval_iter_dir, 'overlay_visualization_data.npz')
         np.savez(viz_sample_fname, viz_dict=viz_dict, viz_data_list=viz_data_list)
@@ -564,7 +564,7 @@ def main(args, global_dict):
                 safeCollisionFilterPair(bodyUniqueIdA=robot.arm.robot_id, bodyUniqueIdB=obj_id, linkIndexA=i, linkIndexB=-1, enableCollision=False, physicsClientId=robot.pb_client.get_client_id())
             robot.arm.eetool.open()
 
-            if jnt_pos is None or grasp_jnt_pos is None: 
+            if jnt_pos is None or grasp_jnt_pos is None:
                 jnt_pos = ik_helper.get_feasible_ik(pre_pre_grasp_ee_pose)
                 grasp_jnt_pos = ik_helper.get_feasible_ik(pre_grasp_ee_pose)
 
@@ -586,7 +586,7 @@ def main(args, global_dict):
                     grasp_img_fname = osp.join(eval_grasp_imgs_dir, '%d.png' % iteration)
                     np2img(grasp_rgb.astype(np.uint8), grasp_img_fname)
                     continue
-                
+
                 ########################### planning to pre_pre_grasp and pre_grasp ##########################
                 if grasp_plan is None:
                     plan1 = ik_helper.plan_joint_motion(robot.arm.get_jpos(), jnt_pos)
@@ -627,7 +627,7 @@ def main(args, global_dict):
                         time.sleep(0.8)
 
                         if g_idx == 1:
-                            grasp_success = object_is_still_grasped(robot, obj_id, right_pad_id, left_pad_id) 
+                            grasp_success = object_is_still_grasped(robot, obj_id, right_pad_id, left_pad_id)
 
                             if grasp_success:
                             # turn OFF collisions between object / table and object / rack, and move to pre-place pose
@@ -637,7 +637,7 @@ def main(args, global_dict):
                                 soft_grasp_close(robot, finger_joint_id, force=40)
                                 robot.arm.set_jpos(jnt_pos_before_grasp, ignore_physics=True)
                                 cid = constraint_grasp_close(robot, obj_id)
-                                
+
                         #########################################################################################################
 
                         if offset_jnts is not None:
@@ -671,7 +671,7 @@ def main(args, global_dict):
 
                     for jnt in place_plan:
                         robot.arm.set_jpos(jnt, wait=False)
-                        time.sleep(0.035) 
+                        time.sleep(0.035)
                     robot.arm.set_jpos(place_plan[-1], wait=True)
 
                 ################################################################################################################
@@ -682,7 +682,7 @@ def main(args, global_dict):
 
                     for jnt in plan3:
                         robot.arm.set_jpos(jnt, wait=False)
-                        time.sleep(0.075) 
+                        time.sleep(0.075)
                     robot.arm.set_jpos(plan3[-1], wait=True)
 
                     p.changeDynamics(obj_id, -1, linearDamping=5, angularDamping=5)
@@ -756,23 +756,23 @@ if __name__ == "__main__":
     parser.add_argument('--demo_exp', type=str, default='grasp_rim_hang_handle_gaussian_precise_w_shelf')
     parser.add_argument('--exp', type=str, default='test_mug_eval')
     parser.add_argument('--object_class', type=str, default='mug')
-    parser.add_argument('--opt_iterations', type=int, default=250)
+    parser.add_argument('--opt_iterations', type=int, default=500)
     parser.add_argument('--num_demo', type=int, default=12, help='number of demos use')
     parser.add_argument('--any_pose', action='store_true')
     parser.add_argument('--num_iterations', type=int, default=100)
     parser.add_argument('--resume_iter', type=int, default=0)
     parser.add_argument('--config', type=str, default='eval_mug_gen')
     parser.add_argument('--model_path', type=str, required=False, default='multi_category_weights')
-    parser.add_argument('--save_vis_per_model', action='store_true')
+    parser.add_argument('--save_vis_per_model', action='store_true', default=True)
     parser.add_argument('--noise_scale', type=float, default=0.05)
     parser.add_argument('--noise_decay', type=float, default=0.75)
-    parser.add_argument('--pybullet_viz', action='store_true')
+    parser.add_argument('--pybullet_viz', action='store_true', default=True)
     parser.add_argument('--dgcnn', action='store_true')
     parser.add_argument('--random', action='store_true', help='utilize random weights')
     parser.add_argument('--early_weight', action='store_true', help='utilize early weights')
     parser.add_argument('--late_weight', action='store_true', help='utilize late weights')
-    parser.add_argument('--rand_mesh_scale', action='store_true')
-    parser.add_argument('--only_test_ids', action='store_true')
+    parser.add_argument('--rand_mesh_scale', action='store_true', default=True)
+    parser.add_argument('--only_test_ids', action='store_true',default=True)
     parser.add_argument('--all_cat_model', action='store_true', help='True if we want to use a model that was trained on multipl categories')
     parser.add_argument('--n_demos', type=int, default=0, help='if some integer value greater than 0, we will only use that many demonstrations')
     parser.add_argument('--acts', type=str, default='all')
@@ -791,7 +791,7 @@ if __name__ == "__main__":
 
     obj_class = args.object_class
     shapenet_obj_dir = osp.join(path_util.get_ndf_obj_descriptions(), obj_class + '_centered_obj_normalized')
-    
+
     demo_load_dir = osp.join(path_util.get_ndf_data(), 'demos', obj_class, args.demo_exp)
 
     expstr = 'exp--' + str(args.exp)
