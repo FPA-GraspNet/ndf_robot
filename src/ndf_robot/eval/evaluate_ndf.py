@@ -34,6 +34,10 @@ from ndf_robot.utils.eval_gen_utils import (
 
 
 def main(args, global_dict):
+
+
+    # print("Global dict: ", global_dict)
+
     if args.debug:
         set_log_level('debug')
     else:
@@ -173,6 +177,7 @@ def main(args, global_dict):
         grasp_demo_fn = grasp_demo_filenames[i]
         place_demo_fn = place_demo_filenames[i]
         grasp_data = np.load(grasp_demo_fn, allow_pickle=True)
+        #print("Table URDF: ", grasp_data['table_urdf'].item())
         place_data = np.load(place_demo_fn, allow_pickle=True)
 
         grasp_data_list.append(grasp_data)
@@ -196,7 +201,7 @@ def main(args, global_dict):
                 place_optimizer_pts = shelf_optimizer_gripper_pts
                 place_optimizer_pts_rs = shelf_optimizer_gripper_pts_rs
             else:
-                print('Using rack points')
+                print('Using rack points') #2000x3 shape 
                 place_optimizer_pts = rack_optimizer_gripper_pts
                 place_optimizer_pts_rs = rack_optimizer_gripper_pts_rs
 
@@ -259,6 +264,7 @@ def main(args, global_dict):
 
     # this is the URDF that was used in the demos -- make sure we load an identical one
     tmp_urdf_fname = osp.join(path_util.get_ndf_descriptions(), 'hanging/table/table_rack_tmp.urdf')
+    print("Table URDF file location: ",tmp_urdf_fname)
     open(tmp_urdf_fname, 'w').write(grasp_data['table_urdf'].item())
     table_id = robot.pb_client.load_urdf(tmp_urdf_fname,
                             cfg.TABLE_POS,
@@ -747,16 +753,16 @@ if __name__ == "__main__":
     parser.add_argument('--num_samples', type=int, default=100)
     parser.add_argument('--data_dir', type=str, default='data')
     parser.add_argument('--eval_data_dir', type=str, default='eval_data')
-    parser.add_argument('--demo_exp', type=str, default='debug_label')
-    parser.add_argument('--exp', type=str, default='debug_eval')
+    parser.add_argument('--demo_exp', type=str, default='grasp_rim_hang_handle_gaussian_precise_w_shelf')
+    parser.add_argument('--exp', type=str, default='test_mug_eval')
     parser.add_argument('--object_class', type=str, default='mug')
     parser.add_argument('--opt_iterations', type=int, default=250)
     parser.add_argument('--num_demo', type=int, default=12, help='number of demos use')
     parser.add_argument('--any_pose', action='store_true')
     parser.add_argument('--num_iterations', type=int, default=100)
     parser.add_argument('--resume_iter', type=int, default=0)
-    parser.add_argument('--config', type=str, default='base_cfg')
-    parser.add_argument('--model_path', type=str, required=True)
+    parser.add_argument('--config', type=str, default='eval_mug_gen')
+    parser.add_argument('--model_path', type=str, required=False, default='multi_category_weights')
     parser.add_argument('--save_vis_per_model', action='store_true')
     parser.add_argument('--noise_scale', type=float, default=0.05)
     parser.add_argument('--noise_decay', type=float, default=0.75)
@@ -785,7 +791,7 @@ if __name__ == "__main__":
 
     obj_class = args.object_class
     shapenet_obj_dir = osp.join(path_util.get_ndf_obj_descriptions(), obj_class + '_centered_obj_normalized')
-
+    
     demo_load_dir = osp.join(path_util.get_ndf_data(), 'demos', obj_class, args.demo_exp)
 
     expstr = 'exp--' + str(args.exp)

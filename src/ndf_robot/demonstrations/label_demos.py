@@ -116,7 +116,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--num_samples', type=int, default=50)
     parser.add_argument('--data_dir', type=str, default='data')
-    parser.add_argument('--exp', type=str, default='debug_label')
+    #parser.add_argument('--exp', type=str, default='debug_label')
+    parser.add_argument('--exp', type=str, default='test_mug')
     parser.add_argument('--metadata_dir', type=str, default='metadata')
     parser.add_argument('--object_class', type=str, default='mug')
     parser.add_argument('--np_seed', type=int, default=0)
@@ -126,7 +127,7 @@ if __name__ == "__main__":
     parser.add_argument('--single_instance', action='store_true')
     parser.add_argument('--fixed_angle', action='store_true')
     parser.add_argument('--with_rack', action='store_true')
-    parser.add_argument('--with_shelf', action='store_true')
+    parser.add_argument('--with_shelf', action='store_true', default=True)
 
     args = parser.parse_args()
     main(args)

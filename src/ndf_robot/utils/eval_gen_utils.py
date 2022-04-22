@@ -295,10 +295,10 @@ def process_xq_rs_data(grasp_data, place_data, shelf=True):
     optimizer_gripper_pts_rs = grasp_data['gripper_pts']
 
     place_demo_rack_pts_rs = place_data['rack_pointcloud_gt']  # points used to represent the rack in canonical pose
-    place_demo_rack_pcd_rs = trimesh.PointCloud(place_demo_rack_pts_rs)
-    place_demo_rack_pose_mat = util.matrix_from_pose(util.list2pose_stamped(place_data['rack_pose_world']))
+    place_demo_rack_pcd_rs = trimesh.PointCloud(place_demo_rack_pts_rs) #convert np to pointcloud object
+    place_demo_rack_pose_mat = util.matrix_from_pose(util.list2pose_stamped(place_data['rack_pose_world'])) #get the pose of the table wrt world frame
     place_demo_rack_pcd_rs.apply_transform(place_demo_rack_pose_mat)  # points used to represent the rack in demo pose
-    place_demo_rack_pts_rs = np.asarray(place_demo_rack_pcd_rs.vertices)
+    place_demo_rack_pts_rs = np.asarray(place_demo_rack_pcd_rs.vertices) #this is to get the vertices of the rigid object
 
     if shelf:
         place_demo_shelf_pts_rs = place_data['shelf_pointcloud_gt']  # points used to represent the rack in canonical pose
