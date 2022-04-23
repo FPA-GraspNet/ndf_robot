@@ -553,16 +553,33 @@ def main(args, global_dict):
 
         target_obj_pcd_obs = np.concatenate(target_obj_pcd_pts, axis=0)  # object shape point cloud
         target_pts_mean = np.mean(target_obj_pcd_obs, axis=0) # Check this - maybe shift this
-        inliers = np.where(np.linalg.norm(target_obj_pcd_obs - target_pts_mean, 2, 1) < 0.2)[0]
-        target_obj_pcd_obs = target_obj_pcd_obs[inliers]
+        inliers = np.where(np.linalg.norm(target_obj_pcd_obs - target_pts_mean, 2, 1) < 0.05)[0]
+        target_obj_pcd_obs = target_obj_pcd_obs[inliers] # Gives 661 points.
 
+        # Sample 500 points around target_pts_mean with SD of 0.05
         # target_obj_sampled_pts = np.random.normal(loc = target_pts_mean, scale=np.array([0.05,0.05,0.05]), size=500) - Correct this
+        target_obj_sample_x = np.random.normal(loc = target_pts_mean[0], scale = 0.05, size=500)
+        target_obj_sample_x = np.expand_dims(target_obj_sample_x, axis=1)
+        target_obj_sample_y = np.random.normal(loc = target_pts_mean[1], scale = 0.05, size=500)
+        target_obj_sample_y = np.expand_dims(target_obj_sample_y, axis=1)
+        target_obj_sample_z = np.random.normal(loc = target_pts_mean[2], scale = 0.05, size=500)
+        target_obj_sample_z = np.expand_dims(target_obj_sample_z, axis=1)
 
-        # target_pts_trimesh = trimesh.PointCloud(target_obj_pcd_obs)
-        
+        target_obj_sampled_pts = np.concatenate((target_obj_sample_x, target_obj_sample_y),axis=1)
+        target_obj_sampled_pts = np.concatenate((target_obj_sampled_pts, target_obj_sample_z),axis=1)
+
         # pre_grasp_ee_pose[0] = new_grasp_pt[0][0]
         # pre_grasp_ee_pose[1] = new_grasp_pt[0][1] - 0.05
         # pre_grasp_ee_pose[2] = new_grasp_pt[0][2] + 0.05
+
+        new_place_optimizer = OccNetOptimizer(
+        model,
+        query_pts=target_obj_sampled_pts, #(500,3)
+        query_pts_real_shape=target_pts_raw, # (307200, 3) -> This should be the actual pcd of object for occupancy computation purposes
+        opt_iterations=args.opt_iterations)
+
+        # Need to optimize pose of current object using new_place_optimizer.optimize_transform_implicit(current obj pointcloud)
+        # Therefore, respawn the sim object back to a random position in source
 
         ##################################### SHRUTHI ############################################
 
