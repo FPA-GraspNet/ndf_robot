@@ -458,30 +458,163 @@ def main(args, global_dict):
             safeCollisionFilterPair(bodyUniqueIdA=obj_id, bodyUniqueIdB=table_id, linkIndexA=-1, linkIndexB=rack_link_id, enableCollision=False)
             safeCollisionFilterPair(bodyUniqueIdA=obj_id, bodyUniqueIdB=table_id, linkIndexA=-1, linkIndexB=shelf_link_id, enableCollision=False)
 
-        # optimize grasp pose
-        pre_grasp_ee_pose_mats, best_idx = grasp_optimizer.optimize_transform_implicit(target_obj_pcd_obs, ee=True)
-        pre_grasp_ee_pose = util.pose_stamped2list(util.pose_from_matrix(pre_grasp_ee_pose_mats[best_idx]))
-        viz_dict['start_ee_pose'] = pre_grasp_ee_pose
+        # # optimize grasp pose
+        # pre_grasp_ee_pose_mats, best_idx = grasp_optimizer.optimize_transform_implicit(target_obj_pcd_obs, ee=True)
+        # pre_grasp_ee_pose = util.pose_stamped2list(util.pose_from_matrix(pre_grasp_ee_pose_mats[best_idx]))
+        # viz_dict['start_ee_pose'] = pre_grasp_ee_pose
+        # print("Pre-grasp-ee-pose from demo: ", pre_grasp_ee_pose)
 
 
-        ########################### grasp post-process #############################
-        new_grasp_pt = post_process_grasp_point(pre_grasp_ee_pose, target_obj_pcd_obs, thin_feature=(not args.non_thin_feature), grasp_viz=args.grasp_viz, grasp_dist_thresh=args.grasp_dist_thresh)
-        print("new_grasp_pt",new_grasp_pt)
-        # new_grasp_pt = p.getBasePositionAndOrientation(obj_id)
-        # print("base pos & orientation: ", new_grasp_pt)
+        # ########################### grasp post-process #############################
+        # new_grasp_pt = post_process_grasp_point(pre_grasp_ee_pose, target_obj_pcd_obs, thin_feature=(not args.non_thin_feature), grasp_viz=args.grasp_viz, grasp_dist_thresh=args.grasp_dist_thresh)
+        # print("new_grasp_pt",new_grasp_pt)
+        # # new_grasp_pt = p.getBasePositionAndOrientation(obj_id)
+        # # print("base pos & orientation: ", new_grasp_pt)
+        # # pre_grasp_ee_pose[0] = new_grasp_pt[0][0]
+        # # pre_grasp_ee_pose[1] = new_grasp_pt[0][1] - 0.05
+        # # pre_grasp_ee_pose[2] = new_grasp_pt[0][2] + 0.05
+        # pre_grasp_ee_pose[:3] = new_grasp_pt
+        # pregrasp_offset_tf = get_ee_offset(ee_pose=pre_grasp_ee_pose)
+        # pre_pre_grasp_ee_pose = util.pose_stamped2list(
+        #     util.transform_pose(pose_source=util.list2pose_stamped(pre_grasp_ee_pose), pose_transform=util.list2pose_stamped(pregrasp_offset_tf)))
+
+        # # optimize placement pose
+        # rack_pose_mats, best_rack_idx = place_optimizer.optimize_transform_implicit(target_obj_pcd_obs, ee=False)
+        # rack_relative_pose = util.pose_stamped2list(util.pose_from_matrix(rack_pose_mats[best_rack_idx]))
+
+        # ee_end_pose = util.transform_pose(pose_source=util.list2pose_stamped(pre_grasp_ee_pose), pose_transform=util.list2pose_stamped(rack_relative_pose))
+        # pre_ee_end_pose2 = util.transform_pose(pose_source=ee_end_pose, pose_transform=preplace_offset_tf)
+        # pre_ee_end_pose1 = util.transform_pose(pose_source=pre_ee_end_pose2, pose_transform=preplace_horizontal_tf)
+
+        # ee_end_pose_list = util.pose_stamped2list(ee_end_pose)
+        # pre_ee_end_pose1_list = util.pose_stamped2list(pre_ee_end_pose1)
+        # pre_ee_end_pose2_list = util.pose_stamped2list(pre_ee_end_pose2)
+
+        # obj_start_pose = obj_pose_world
+        # obj_end_pose = util.transform_pose(pose_source=obj_start_pose, pose_transform=util.list2pose_stamped(rack_relative_pose))
+        # obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
+        # viz_dict['final_obj_pose'] = obj_end_pose_list
+
+        # # save visualizations for debugging / looking at optimization solutions
+        # if args.save_vis_per_model:
+        #     analysis_dir = args.model_path + '_' + str(obj_shapenet_id)
+        #     eval_iter_dir = osp.join(eval_save_dir, analysis_dir)
+        #     if not osp.exists(eval_iter_dir):
+        #         os.makedirs(eval_iter_dir)
+        #     for f_id, fname in enumerate(grasp_optimizer.viz_files):
+        #         new_viz_fname = fname.split('/')[-1]
+        #         viz_index = int(new_viz_fname.split('.html')[0].split('_')[-1])
+        #         new_fname = osp.join(eval_iter_dir, new_viz_fname)
+        #         if args.save_all_opt_results:
+        #             shutil.copy(fname, new_fname)
+        #         else:
+        #             if viz_index == best_idx:
+        #                 shutil.copy(fname, new_fname)
+        #     for f_id, fname in enumerate(place_optimizer.viz_files):
+        #         new_viz_fname = fname.split('/')[-1]
+        #         viz_index = int(new_viz_fname.split('.html')[0].split('_')[-1])
+        #         new_fname = osp.join(eval_iter_dir, new_viz_fname)
+        #         if args.save_all_opt_results:
+        #             shutil.copy(fname, new_fname)
+        #         else:
+        #             if viz_index == best_rack_idx:
+        #                 shutil.copy(fname, new_fname)
+
+        # viz_data_list.append(viz_dict)
+        # viz_sample_fname = osp.join(eval_iter_dir, 'overlay_visualization_data.npz')
+        # np.savez(viz_sample_fname, viz_dict=viz_dict, viz_data_list=viz_data_list)
+
+        ##################################### SHRUTHI ############################################
+        # Target pose scene:
+        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
+        safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=False)
+        robot.pb_client.set_step_sim(True)
+        safeRemoveConstraint(o_cid)
+        robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
+
+        time.sleep(1.0)
+
+        # Get grasp point in target pose of object
+        obj_pose_world_target = p.getBasePositionAndOrientation(obj_id)
+        print("Target object pose: ", obj_pose_world_target)
+
+        # # get target obj pcd
+        # target_obj_pcd_pts = []
+
+        # target_rgb, target_depth, target_seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
+        # target_pts_raw, _ = cam.get_pcd(in_world=True, rgb_image=target_rgb, depth_image=target_depth, depth_min=0.0, depth_max=np.inf)
+        
+        # target_flat_seg = target_seg.flatten()
+        # target_obj_inds = np.where(target_flat_seg == obj_id)
+        # target_obj_pts = target_pts_raw[target_obj_inds[0], :]
+        # target_obj_pcd_pts.append(util.crop_pcd(target_obj_pts)) # confirm what the limits mean
+
+        # target_obj_pcd_obs = np.concatenate(target_obj_pcd_pts, axis=0)  # object shape point cloud
+        # target_pts_mean = np.mean(target_obj_pcd_obs, axis=0) # Check this - maybe shift this
+        # inliers = np.where(np.linalg.norm(target_obj_pcd_obs - target_pts_mean, 2, 1) < 0.05)[0]
+        # target_obj_pcd_obs = target_obj_pcd_obs[inliers] # Gives 661 points.
+
+        # # Sample 500 points around target_pts_mean with SD of 0.05
+        # # target_obj_sampled_pts = np.random.normal(loc = target_pts_mean, scale=np.array([0.05,0.05,0.05]), size=500) - Correct this
+        # target_obj_sample_x = np.random.normal(loc = target_pts_mean[0], scale = 0.05, size=500)
+        # target_obj_sample_x = np.expand_dims(target_obj_sample_x, axis=1)
+        # target_obj_sample_y = np.random.normal(loc = target_pts_mean[1], scale = 0.05, size=500)
+        # target_obj_sample_y = np.expand_dims(target_obj_sample_y, axis=1)
+        # target_obj_sample_z = np.random.normal(loc = target_pts_mean[2], scale = 0.05, size=500)
+        # target_obj_sample_z = np.expand_dims(target_obj_sample_z, axis=1)
+
+        # target_obj_sampled_pts = np.concatenate((target_obj_sample_x, target_obj_sample_y),axis=1)
+        # target_obj_sampled_pts = np.concatenate((target_obj_sampled_pts, target_obj_sample_z),axis=1)
+
         # pre_grasp_ee_pose[0] = new_grasp_pt[0][0]
         # pre_grasp_ee_pose[1] = new_grasp_pt[0][1] - 0.05
         # pre_grasp_ee_pose[2] = new_grasp_pt[0][2] + 0.05
-        pre_grasp_ee_pose[:3] = new_grasp_pt
+
+        # There is no grasp optimizer.
+
+        # new_grasp_optimizer = OccNetOptimizer(
+        # model,
+        # query_pts=target_obj_sampled_pts, #(500,3)
+        # query_pts_real_shape=target_pts_raw, # (307200, 3) -> This should be the actual pcd of object for occupancy computation purposes
+        # opt_iterations=args.opt_iterations)
+
+        # Find where to grasp object in target pose
+        ee_end_pose = [0,0,0]
+        ee_end_pose[0] = obj_pose_world_target[0][0]
+        ee_end_pose[1] = obj_pose_world_target[0][1] - 0.05
+        ee_end_pose[2] = obj_pose_world_target[0][2] + 0.07
+        # grasp_offset_tf = get_ee_offset(ee_pose=grasp_ee_pose_target)
+        # pre_pre_grasp_ee_pose = util.pose_stamped2list(
+        #     util.transform_pose(pose_source=util.list2pose_stamped(pre_grasp_ee_pose), pose_transform=util.list2pose_stamped(pregrasp_offset_tf)))
+
+        # We only have a place optimizer - this encodes the rack pcd points w.r.t important geometric features of mug
+        new_place_optimizer = OccNetOptimizer(
+        model,
+        query_pts=place_optimizer_pts,
+        query_pts_real_shape=place_optimizer_pts_rs,
+        opt_iterations=args.opt_iterations)
+
+        # Need to optimize pose of current object using new_place_optimizer.optimize_transform_implicit(current obj pointcloud)
+        # Therefore, respawn the sim object back to a random position in source
+        robot.pb_client.set_step_sim(False)
+        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
+        if args.any_pose:
+            robot.pb_client.set_step_sim(True)
+        safeRemoveConstraint(o_cid)
+        p.resetBasePositionAndOrientation(obj_id, pos, ori)
+        print("Source object pose: ", p.getBasePositionAndOrientation(obj_id))
+        time.sleep(0.5)
+
+        # optimize placement pose
+        rack_pose_mats, best_rack_idx = new_place_optimizer.optimize_transform_implicit(target_obj_pcd_obs, ee=False)
+        rack_relative_pose = util.pose_stamped2list(util.pose_from_matrix(rack_pose_mats[best_rack_idx]))
+
+        # Transform estimated grasp to source scene
+        pre_grasp_ee_pose = util.inverse_transform_pose(pose_target=ee_end_pose, pose_transform=util.list2pose_stamped(rack_relative_pose))
         pregrasp_offset_tf = get_ee_offset(ee_pose=pre_grasp_ee_pose)
         pre_pre_grasp_ee_pose = util.pose_stamped2list(
             util.transform_pose(pose_source=util.list2pose_stamped(pre_grasp_ee_pose), pose_transform=util.list2pose_stamped(pregrasp_offset_tf)))
 
-        # optimize placement pose
-        rack_pose_mats, best_rack_idx = place_optimizer.optimize_transform_implicit(target_obj_pcd_obs, ee=False)
-        rack_relative_pose = util.pose_stamped2list(util.pose_from_matrix(rack_pose_mats[best_rack_idx]))
-
-        ee_end_pose = util.transform_pose(pose_source=util.list2pose_stamped(pre_grasp_ee_pose), pose_transform=util.list2pose_stamped(rack_relative_pose))
         pre_ee_end_pose2 = util.transform_pose(pose_source=ee_end_pose, pose_transform=preplace_offset_tf)
         pre_ee_end_pose1 = util.transform_pose(pose_source=pre_ee_end_pose2, pose_transform=preplace_horizontal_tf)
 
@@ -489,12 +622,15 @@ def main(args, global_dict):
         pre_ee_end_pose1_list = util.pose_stamped2list(pre_ee_end_pose1)
         pre_ee_end_pose2_list = util.pose_stamped2list(pre_ee_end_pose2)
 
+        obj_pose_world = p.getBasePositionAndOrientation(obj_id)
+        obj_pose_world = util.list2pose_stamped(list(obj_pose_world[0]) + list(obj_pose_world[1]))
+
         obj_start_pose = obj_pose_world
         obj_end_pose = util.transform_pose(pose_source=obj_start_pose, pose_transform=util.list2pose_stamped(rack_relative_pose))
         obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
         viz_dict['final_obj_pose'] = obj_end_pose_list
 
-        # save visualizations for debugging / looking at optimizaiton solutions
+        # save visualizations for debugging / looking at optimization solutions
         if args.save_vis_per_model:
             analysis_dir = args.model_path + '_' + str(obj_shapenet_id)
             eval_iter_dir = osp.join(eval_save_dir, analysis_dir)
@@ -506,9 +642,9 @@ def main(args, global_dict):
                 new_fname = osp.join(eval_iter_dir, new_viz_fname)
                 if args.save_all_opt_results:
                     shutil.copy(fname, new_fname)
-                else:
-                    if viz_index == best_idx:
-                        shutil.copy(fname, new_fname)
+                # else:
+                #     if viz_index == best_idx:
+                #         shutil.copy(fname, new_fname)
             for f_id, fname in enumerate(place_optimizer.viz_files):
                 new_viz_fname = fname.split('/')[-1]
                 viz_index = int(new_viz_fname.split('.html')[0].split('_')[-1])
@@ -524,88 +660,30 @@ def main(args, global_dict):
         np.savez(viz_sample_fname, viz_dict=viz_dict, viz_data_list=viz_data_list)
 
         ##################################### SHRUTHI ############################################
-        # Target pose scene:
-        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
-        safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=False)
-        robot.pb_client.set_step_sim(True)
-        safeRemoveConstraint(o_cid)
-        robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
 
-        time.sleep(1.0)
+        # # reset object to placement pose to detect placement success
+        # safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
+        # safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=False)
+        # robot.pb_client.set_step_sim(True)
+        # safeRemoveConstraint(o_cid)
+        # robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
 
-        # Get grasp point in target pose of object
-        obj_pose_world_target = p.getBasePositionAndOrientation(obj_id)
-        target_ee_pos = [0,0,0]
-        target_ee_pos[0] = obj_pose_world_target[0][0]
-        target_ee_pos[1] = obj_pose_world_target[0][1] - 0.05
-        target_ee_pos[2] = obj_pose_world_target[0][2] + 0.05
+        # time.sleep(1.0)
+        # teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
+        # teleport_img_fname = osp.join(eval_teleport_imgs_dir, '%d.png' % iteration)
+        # np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
+        # safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=True)
+        # robot.pb_client.set_step_sim(False)
+        # time.sleep(1.0)
 
-        # get target obj pcd
-        target_obj_pcd_pts = []
+        # obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
+        # touching_surf = len(obj_surf_contacts) > 0
+        # place_success_teleport = touching_surf
+        # place_success_teleport_list.append(place_success_teleport)
 
-        target_rgb, target_depth, target_seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
-        target_pts_raw, _ = cam.get_pcd(in_world=True, rgb_image=target_rgb, depth_image=target_depth, depth_min=0.0, depth_max=np.inf)
-        
-        target_flat_seg = target_seg.flatten()
-        target_obj_inds = np.where(target_flat_seg == obj_id)
-        target_obj_pts = target_pts_raw[target_obj_inds[0], :]
-        target_obj_pcd_pts.append(util.crop_pcd(target_obj_pts)) # confirm what the limits mean
-
-        target_obj_pcd_obs = np.concatenate(target_obj_pcd_pts, axis=0)  # object shape point cloud
-        target_pts_mean = np.mean(target_obj_pcd_obs, axis=0) # Check this - maybe shift this
-        inliers = np.where(np.linalg.norm(target_obj_pcd_obs - target_pts_mean, 2, 1) < 0.05)[0]
-        target_obj_pcd_obs = target_obj_pcd_obs[inliers] # Gives 661 points.
-
-        # Sample 500 points around target_pts_mean with SD of 0.05
-        # target_obj_sampled_pts = np.random.normal(loc = target_pts_mean, scale=np.array([0.05,0.05,0.05]), size=500) - Correct this
-        target_obj_sample_x = np.random.normal(loc = target_pts_mean[0], scale = 0.05, size=500)
-        target_obj_sample_x = np.expand_dims(target_obj_sample_x, axis=1)
-        target_obj_sample_y = np.random.normal(loc = target_pts_mean[1], scale = 0.05, size=500)
-        target_obj_sample_y = np.expand_dims(target_obj_sample_y, axis=1)
-        target_obj_sample_z = np.random.normal(loc = target_pts_mean[2], scale = 0.05, size=500)
-        target_obj_sample_z = np.expand_dims(target_obj_sample_z, axis=1)
-
-        target_obj_sampled_pts = np.concatenate((target_obj_sample_x, target_obj_sample_y),axis=1)
-        target_obj_sampled_pts = np.concatenate((target_obj_sampled_pts, target_obj_sample_z),axis=1)
-
-        # pre_grasp_ee_pose[0] = new_grasp_pt[0][0]
-        # pre_grasp_ee_pose[1] = new_grasp_pt[0][1] - 0.05
-        # pre_grasp_ee_pose[2] = new_grasp_pt[0][2] + 0.05
-
-        new_place_optimizer = OccNetOptimizer(
-        model,
-        query_pts=target_obj_sampled_pts, #(500,3)
-        query_pts_real_shape=target_pts_raw, # (307200, 3) -> This should be the actual pcd of object for occupancy computation purposes
-        opt_iterations=args.opt_iterations)
-
-        # Need to optimize pose of current object using new_place_optimizer.optimize_transform_implicit(current obj pointcloud)
-        # Therefore, respawn the sim object back to a random position in source
-
-        ##################################### SHRUTHI ############################################
-
-        # reset object to placement pose to detect placement success
-        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
-        safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=False)
-        robot.pb_client.set_step_sim(True)
-        safeRemoveConstraint(o_cid)
-        robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
-
-        time.sleep(1.0)
-        teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
-        teleport_img_fname = osp.join(eval_teleport_imgs_dir, '%d.png' % iteration)
-        np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
-        safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=True)
-        robot.pb_client.set_step_sim(False)
-        time.sleep(1.0)
-
-        obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
-        touching_surf = len(obj_surf_contacts) > 0
-        place_success_teleport = touching_surf
-        place_success_teleport_list.append(place_success_teleport)
-
-        time.sleep(1.0)
-        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
-        robot.pb_client.reset_body(obj_id, pos, ori)
+        # time.sleep(1.0)
+        # safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
+        # robot.pb_client.reset_body(obj_id, pos, ori)
 
         # attempt grasp and solve for plan to execute placement with arm
         jnt_pos = grasp_jnt_pos = grasp_plan = None

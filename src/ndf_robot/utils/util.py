@@ -387,6 +387,14 @@ def transform_pose(pose_source, pose_transform):
         T_pose_final_source, frame_id=pose_source.header.frame_id)
     return pose_final_source
 
+def inverse_transform_pose(pose_target, pose_transform):
+    T_pose_target = matrix_from_pose(pose_target)
+    T_transform_target = matrix_from_pose(pose_transform)
+    T_transform_target_inv = np.linalg.inv(T_transform_target)
+    T_pose_final_source = np.matmul(T_transform_target_inv, T_pose_target)
+    pose_final_source = pose_from_matrix(
+        T_pose_final_source, frame_id=pose_target.header.frame_id)
+    return pose_final_source
 
 def transform_body(pose_source_world, pose_transform_target_body):
     #convert source to target frame
