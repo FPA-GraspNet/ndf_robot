@@ -18,7 +18,7 @@ from airobot.utils.common import euler2quat
 
 import ndf_robot.model.vnn_occupancy_net_pointnet_dgcnn as vnn_occupancy_network
 from ndf_robot.utils import util, trimesh_util
-from ndf_robot.utils.util import np2img
+from ndf_robot.utils.util import PoseStamped, np2img
 
 from ndf_robot.opt.optimizer import OccNetOptimizer
 from ndf_robot.robot.multicam import MultiCams
@@ -526,6 +526,73 @@ def main(args, global_dict):
 
         ##################################### SHRUTHI ############################################
 
+        # Start with hardcoded target pose
+        obj_end_pose = PoseStamped()
+        obj_end_pose.pose.position.x = 0.5168864236237299
+        obj_end_pose.pose.position.y = 0.1759646156040694
+        obj_end_pose.pose.position.z = 1.1698229785998042
+        obj_end_pose.pose.orientation.x = 0.29852462500313637
+        obj_end_pose.pose.orientation.y = -0.5982721882985429
+        obj_end_pose.pose.orientation.z = -0.27218172698990295
+        obj_end_pose.pose.orientation.w = 0.6920047286456962
+        obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
+        viz_dict['final_obj_pose'] = obj_end_pose_list
+
+        # Reset scene to Target Object pose scene:
+        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
+        safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=False)
+        robot.pb_client.set_step_sim(True)
+        safeRemoveConstraint(o_cid)
+        robot.pb_client.reset_body(obj_id, obj_end_pose_list[:3], obj_end_pose_list[3:])
+
+        time.sleep(1.0)
+
+        obj_pose_world_target = p.getBasePositionAndOrientation(obj_id)
+        print("Target object pose: ", obj_pose_world_target)
+
+
+        # Sample points from rack with mug in target pose
+        # Step 1 - uniform sampled points
+        rack_mesh_file = osp.join(path_util.get_ndf_descriptions(), 'hanging/table/simple_rack.obj')
+        rack_mesh = trimesh.load_mesh(rack_mesh_file)
+        rack_pts_gt = rack_mesh.sample(500)
+        rack_pts_bb = rack_mesh.bounding_box_oriented
+        rack_pts_uniform = rack_pts_bb.sample_volume(500)
+
+        rack_pose_world = np.concatenate(p.getLinkState(table_id, rack_link_id)[:2]).tolist()
+
+        uniform_place_demo_rack_pcd = trimesh.PointCloud(rack_pts_uniform)
+        uniform_place_demo_rack_pose_mat = util.matrix_from_pose(util.list2pose_stamped(rack_pose_world))
+        uniform_place_demo_rack_pcd.apply_transform(uniform_place_demo_rack_pose_mat)  # points used to represent the rack in demo pose
+        rack_optimizer_pts_no_demo = np.asarray(uniform_place_demo_rack_pcd.vertices)
+
+        # Step 2 - real shape points
+        place_demo_rack_pts_rs = rack_pts_gt  # points used to represent the rack in canonical pose
+        place_demo_rack_pcd_rs = trimesh.PointCloud(place_demo_rack_pts_rs) #convert np to pointcloud object
+        place_demo_rack_pose_mat = util.matrix_from_pose(util.list2pose_stamped(rack_pose_world)) #get the pose of the table wrt world frame
+        place_demo_rack_pcd_rs.apply_transform(place_demo_rack_pose_mat)  # points used to represent the rack in demo pose
+        rack_optimizer_pts_no_demo_rs = np.asarray(place_demo_rack_pcd_rs.vertices) #this is to get the vertices of the rigid object
+
+        if cfg.DEMOS.PLACEMENT_SURFACE == 'shelf':
+            print('Using shelf points')
+            place_optimizer_pts = shelf_optimizer_gripper_pts
+            place_optimizer_pts_rs = shelf_optimizer_gripper_pts_rs
+        else:
+            print('Using rack points') #2000x3 shape
+            place_optimizer_pts = rack_optimizer_pts_no_demo
+            place_optimizer_pts_rs = rack_optimizer_pts_no_demo_rs
+
+        # if cfg.DEMOS.PLACEMENT_SURFACE == 'shelf':
+        #     target_info, rack_target_info, shapenet_id = process_demo_data_shelf(grasp_data, place_data, cfg=None)
+        # else:
+        #     target_info, rack_target_info, shapenet_id = process_demo_data_rack(grasp_data, place_data, cfg=None)
+
+        # if cfg.DEMOS.PLACEMENT_SURFACE == 'shelf':
+        #     rack_target_info['demo_query_pts'] = place_optimizer_pts
+        # demo_target_info_list.append(target_info)
+        # demo_rack_target_info_list.append(rack_target_info)
+        # demo_shapenet_ids.append(shapenet_id)
+
         # We only have a place optimizer - this encodes the rack pcd points w.r.t important geometric features of mug
         # We have no notion of gripper. This is just a snapshot of how the object should be placed
         new_place_optimizer = OccNetOptimizer(
@@ -534,9 +601,129 @@ def main(args, global_dict):
         query_pts_real_shape=place_optimizer_pts_rs,
         opt_iterations=args.opt_iterations)
 
+
+        # get object point cloud in target scene
+        depth_imgs = []
+        seg_idxs = []
+        obj_pcd_pts = []
+        table_pcd_pts = []
+        rack_pcd_pts = []
+
+        obj_pose_world = p.getBasePositionAndOrientation(obj_id)
+        obj_pose_world = util.list2pose_stamped(list(obj_pose_world[0]) + list(obj_pose_world[1]))
+        viz_dict['start_obj_pose'] = util.pose_stamped2list(obj_pose_world)
+        for i, cam in enumerate(cams.cams):
+            # get image and raw point cloud
+            rgb, depth, seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
+            pts_raw, _ = cam.get_pcd(in_world=True, rgb_image=rgb, depth_image=depth, depth_min=0.0, depth_max=np.inf)
+
+            # flatten and find corresponding pixels in segmentation mask
+            flat_seg = seg.flatten()
+            flat_depth = depth.flatten()
+            obj_inds = np.where(flat_seg == obj_id)
+            table_inds = np.where(flat_seg == table_id)
+            seg_depth = flat_depth[obj_inds[0]]
+
+            obj_pts = pts_raw[obj_inds[0], :]
+            obj_pcd_pts.append(util.crop_pcd(obj_pts)) # confirm what the limits mean
+            table_pts = pts_raw[table_inds[0], :][::int(table_inds[0].shape[0]/500)]
+            table_pcd_pts.append(table_pts)
+
+            if rack_link_id is not None:
+                rack_val = table_id + ((rack_link_id+1) << 24)
+                rack_inds = np.where(flat_seg == rack_val)
+                if rack_inds[0].shape[0] > 0:
+                    rack_pts = pts_raw[rack_inds[0], :]
+                    rack_pcd_pts.append(rack_pts)
+
+            depth_imgs.append(seg_depth)
+            seg_idxs.append(obj_inds)
+
+        target_obj_pcd_obs = np.concatenate(obj_pcd_pts, axis=0)  # object shape point cloud
+
+        # Set demo info : Check this
+        rack_target_info = dict(
+        demo_query_pts=place_optimizer_pts, 
+        demo_query_pts_real_shape=place_demo_rack_pts_rs,
+        demo_obj_pts=target_obj_pcd_obs, 
+        demo_ee_pose_world=None,
+        demo_query_pt_pose=None,
+        demo_obj_rel_transform=None)
+
+        demo_rack_target_info_list.append(rack_target_info)
         new_place_optimizer.set_demo_info(demo_rack_target_info_list)
 
-        # optimize placement pose [same as with NDF].
+        # Respawn the sim object back to a random position in source
+        teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
+        teleport_img_fname = osp.join(eval_teleport_imgs_dir, '%d.png' % iteration)
+        np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
+        safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=True)
+        robot.pb_client.set_step_sim(False)
+        time.sleep(1.0)
+
+        obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
+        touching_surf = len(obj_surf_contacts) > 0
+        place_success_teleport = touching_surf
+        place_success_teleport_list.append(place_success_teleport)
+
+        time.sleep(1.0)
+
+        robot.pb_client.set_step_sim(False)
+        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
+        if args.any_pose:
+            robot.pb_client.set_step_sim(True)
+        safeRemoveConstraint(o_cid)
+        p.resetBasePositionAndOrientation(obj_id, pos, ori)
+        print("Source object pose: ", p.getBasePositionAndOrientation(obj_id))
+        time.sleep(0.5)
+
+        # get object point cloud
+        depth_imgs = []
+        seg_idxs = []
+        obj_pcd_pts = []
+        table_pcd_pts = []
+        rack_pcd_pts = []
+
+        obj_pose_world = p.getBasePositionAndOrientation(obj_id)
+        obj_pose_world = util.list2pose_stamped(list(obj_pose_world[0]) + list(obj_pose_world[1]))
+        viz_dict['start_obj_pose'] = util.pose_stamped2list(obj_pose_world)
+        for i, cam in enumerate(cams.cams):
+            # get image and raw point cloud
+            rgb, depth, seg = cam.get_images(get_rgb=True, get_depth=True, get_seg=True)
+            pts_raw, _ = cam.get_pcd(in_world=True, rgb_image=rgb, depth_image=depth, depth_min=0.0, depth_max=np.inf)
+
+            # flatten and find corresponding pixels in segmentation mask
+            flat_seg = seg.flatten()
+            flat_depth = depth.flatten()
+            obj_inds = np.where(flat_seg == obj_id)
+            table_inds = np.where(flat_seg == table_id)
+            seg_depth = flat_depth[obj_inds[0]]
+
+            obj_pts = pts_raw[obj_inds[0], :]
+            obj_pcd_pts.append(util.crop_pcd(obj_pts)) # confirm what the limits mean
+            table_pts = pts_raw[table_inds[0], :][::int(table_inds[0].shape[0]/500)]
+            table_pcd_pts.append(table_pts)
+
+            if rack_link_id is not None:
+                rack_val = table_id + ((rack_link_id+1) << 24)
+                rack_inds = np.where(flat_seg == rack_val)
+                if rack_inds[0].shape[0] > 0:
+                    rack_pts = pts_raw[rack_inds[0], :]
+                    rack_pcd_pts.append(rack_pts)
+
+            depth_imgs.append(seg_depth)
+            seg_idxs.append(obj_inds)
+
+        target_obj_pcd_obs = np.concatenate(obj_pcd_pts, axis=0)  # object shape point cloud
+        target_pts_mean = np.mean(target_obj_pcd_obs, axis=0)
+        inliers = np.where(np.linalg.norm(target_obj_pcd_obs - target_pts_mean, 2, 1) < 0.2)[0]
+        target_obj_pcd_obs = target_obj_pcd_obs[inliers]
+
+        if obj_class == 'mug':
+            rack_color = p.getVisualShapeData(table_id)[rack_link_id][7]
+            show_link(table_id, rack_link_id, rack_color)
+
+        # optimize placement pose [same as with NDF]. Here: query points are pcd of object in source pose
         # rack_relative_pose is the transform which will bring source mug to target pose
         rack_pose_mats, best_rack_idx = new_place_optimizer.optimize_transform_implicit(target_obj_pcd_obs, ee=False)
         rack_relative_pose = util.pose_stamped2list(util.pose_from_matrix(rack_pose_mats[best_rack_idx]))
@@ -546,9 +733,9 @@ def main(args, global_dict):
         obj_pose_world = util.list2pose_stamped(list(obj_pose_world[0]) + list(obj_pose_world[1]))
 
         obj_start_pose = obj_pose_world
-        obj_end_pose = util.transform_pose(pose_source=obj_start_pose, pose_transform=util.list2pose_stamped(rack_relative_pose))
-        obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
-        viz_dict['final_obj_pose'] = obj_end_pose_list
+        # obj_end_pose = util.transform_pose(pose_source=obj_start_pose, pose_transform=util.list2pose_stamped(rack_relative_pose))
+        # obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
+        #
 
         # Reset scene to Target Object pose scene:
         safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
@@ -574,30 +761,6 @@ def main(args, global_dict):
         ee_end_pose[4] = 0
         ee_end_pose[5] = 0.3827
         ee_end_pose[6] = 0.9238
-
-        # Respawn the sim object back to a random position in source
-        teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
-        teleport_img_fname = osp.join(eval_teleport_imgs_dir, '%d.png' % iteration)
-        np2img(teleport_rgb.astype(np.uint8), teleport_img_fname)
-        safeCollisionFilterPair(obj_id, table_id, -1, placement_link_id, enableCollision=True)
-        robot.pb_client.set_step_sim(False)
-        time.sleep(1.0)
-
-        obj_surf_contacts = p.getContactPoints(obj_id, table_id, -1, placement_link_id)
-        touching_surf = len(obj_surf_contacts) > 0
-        place_success_teleport = touching_surf
-        place_success_teleport_list.append(place_success_teleport)
-
-        time.sleep(1.0)
-
-        robot.pb_client.set_step_sim(False)
-        safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
-        if args.any_pose:
-            robot.pb_client.set_step_sim(True)
-        safeRemoveConstraint(o_cid)
-        p.resetBasePositionAndOrientation(obj_id, pos, ori)
-        print("Source object pose: ", p.getBasePositionAndOrientation(obj_id))
-        time.sleep(0.5)
 
         # Transform estimated grasp to source scene (it will be an inverse transform)
         ee_end_pose = util.list2pose_stamped(ee_end_pose)
