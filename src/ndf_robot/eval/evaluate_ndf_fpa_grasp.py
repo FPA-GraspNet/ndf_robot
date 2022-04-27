@@ -27,6 +27,7 @@ from ndf_robot.config.default_obj_cfg import get_obj_cfg_defaults
 from ndf_robot.utils import path_util
 from ndf_robot.share.globals import bad_shapenet_mug_ids_list, bad_shapenet_bowls_ids_list, bad_shapenet_bottles_ids_list
 from ndf_robot.utils.franka_ik import FrankaIK
+from ndf_robot.utils.util import PoseStamped, np2img
 from ndf_robot.utils.eval_gen_utils import (
     soft_grasp_close, constraint_grasp_close, constraint_obj_world, constraint_grasp_open,
     safeCollisionFilterPair, object_is_still_grasped, get_ee_offset, post_process_grasp_point,
@@ -546,7 +547,15 @@ def main(args, global_dict):
         obj_pose_world = util.list2pose_stamped(list(obj_pose_world[0]) + list(obj_pose_world[1]))
 
         obj_start_pose = obj_pose_world
-        obj_end_pose = util.transform_pose(pose_source=obj_start_pose, pose_transform=util.list2pose_stamped(rack_relative_pose))
+        # Hardcoded target pose
+        obj_end_pose = PoseStamped()
+        obj_end_pose.pose.position.x = 0.5168864236237299
+        obj_end_pose.pose.position.y = 0.1759646156040694
+        obj_end_pose.pose.position.z = 1.1698229785998042
+        obj_end_pose.pose.orientation.x = 0.29852462500313637
+        obj_end_pose.pose.orientation.y = -0.5982721882985429
+        obj_end_pose.pose.orientation.z = -0.27218172698990295
+        obj_end_pose.pose.orientation.w = 0.6920047286456962
         obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
         viz_dict['final_obj_pose'] = obj_end_pose_list
 
