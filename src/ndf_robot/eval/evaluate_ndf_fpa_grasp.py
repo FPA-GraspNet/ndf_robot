@@ -258,14 +258,21 @@ def main(args, global_dict):
     table_ori = euler2quat([0, 0, np.pi / 2])
 
     # this is the URDF that was used in the demos -- make sure we load an identical one
-    tmp_urdf_fname = osp.join(path_util.get_ndf_descriptions(), 'hanging/table/table_rack_tmp.urdf')
-    print("Table URDF file location: ",tmp_urdf_fname)
+    if obj_class == 'mug':
+        tmp_urdf_fname = osp.join(path_util.get_ndf_descriptions(), 'hanging/table/table_rack_tmp.urdf')
+    elif obj_class == 'bowl':
+        tmp_urdf_fname = osp.join(path_util.get_ndf_descriptions(), 'hanging/table/table_shelf.urdf')
+    else:
+        tmp_urdf_fname = osp.join(path_util.get_ndf_descriptions(), 'hanging/table/table_shelf.urdf')
+
+    # print("Table URDF file location: ",tmp_urdf_fname)
     table_id = robot.pb_client.load_urdf(tmp_urdf_fname,
                             cfg.TABLE_POS,
                             table_ori,
                             scaling=cfg.TABLE_SCALING)
     if obj_class == 'mug':
         rack_link_id = 0
+        placement_surface = 'rack'
         shelf_link_id = 1
     elif obj_class in ['bowl', 'bottle']:
         print("Bowl!")
@@ -412,16 +419,29 @@ def main(args, global_dict):
         ##################################### SHRUTHI ############################################
 
         # Start with hardcoded target pose
-        obj_end_pose = PoseStamped()
-        obj_end_pose.pose.position.x = 0.5168864236237299
-        obj_end_pose.pose.position.y = 0.1759646156040694
-        obj_end_pose.pose.position.z = 1.1698229785998042
-        obj_end_pose.pose.orientation.x = 0.29852462500313637
-        obj_end_pose.pose.orientation.y = -0.5982721882985429
-        obj_end_pose.pose.orientation.z = -0.27218172698990295
-        obj_end_pose.pose.orientation.w = 0.6920047286456962
-        obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
-        viz_dict['final_obj_pose'] = obj_end_pose_list
+        if obj_class=='mug':
+            obj_end_pose = PoseStamped()
+            obj_end_pose.pose.position.x = 0.5168864236237299
+            obj_end_pose.pose.position.y = 0.1759646156040694
+            obj_end_pose.pose.position.z = 1.1698229785998042
+            obj_end_pose.pose.orientation.x = 0.29852462500313637
+            obj_end_pose.pose.orientation.y = -0.5982721882985429
+            obj_end_pose.pose.orientation.z = -0.27218172698990295
+            obj_end_pose.pose.orientation.w = 0.6920047286456962
+            obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
+            viz_dict['final_obj_pose'] = obj_end_pose_list
+
+        elif obj_class in ['bottle', 'bowl']:
+            obj_end_pose = PoseStamped()
+            obj_end_pose.pose.position.x = 0.37288
+            obj_end_pose.pose.position.y = -0.368886
+            obj_end_pose.pose.position.z = 1.13
+            obj_end_pose.pose.orientation.x = 0.700088958933695
+            obj_end_pose.pose.orientation.y = 0.0993752966241366
+            obj_end_pose.pose.orientation.z = 0.0993752966241366
+            obj_end_pose.pose.orientation.w = 0.700088958933695
+            obj_end_pose_list = util.pose_stamped2list(obj_end_pose)
+            viz_dict['final_obj_pose'] = obj_end_pose_list
 
         # Reset scene to Target Object pose scene:
         safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
@@ -455,19 +475,10 @@ def main(args, global_dict):
         opt_iterations=args.opt_iterations)
 
         # Get point cloud of mug in target configuration 
-        target_obj_pcd_obs = get_pointcloud(obj_id, table_id, rack_link_id, cams)
-
-        # Set demo info: For the NDF optimizer, we need to give an information of these two items
-        rack_target_info = {
-        'demo_query_pts':place_optimizer_pts, 
-        'demo_obj_pts':target_obj_pcd_obs, 
-        }
-
-        single_target = []
-        single_target.append(rack_target_info)
-
-        # demo_shapenet_ids.append(shapenet_id)
-        new_place_optimizer.set_demo_info(single_target)
+        if placement_surface == 'shelf':
+            target_obj_pcd_obs = get_pointcloud(obj_id, table_id, shelf_link_id, cams)
+        else:
+            target_obj_pcd_obs = get_pointcloud(obj_id, table_id, rack_link_id, cams)
 
         # Respawn the sim object back to a random position in source
         teleport_rgb = robot.cam.get_images(get_rgb=True)[0]
@@ -493,15 +504,30 @@ def main(args, global_dict):
         print("Source object pose: ", p.getBasePositionAndOrientation(obj_id))
         time.sleep(0.5)
 
-        # Get point cloud of mug in source configuration 
-        source_obj_pcd_obs = get_pointcloud(obj_id, table_id, rack_link_id, cams)
-        # source_pts_mean = np.mean(source_obj_pcd_obs, axis=0)
-        # inliers = np.where(np.linalg.norm(source_obj_pcd_obs - source_pts_mean, 2, 1) < 0.2)[0]
-        # source_obj_pcd_obs = source_obj_pcd_obs[inliers]
+        # Get point cloud of mug in source configuration
+        if placement_surface == 'shelf':
+            source_obj_pcd_obs = get_pointcloud(obj_id, table_id, shelf_link_id, cams)
+        else:
+            source_obj_pcd_obs = get_pointcloud(obj_id, table_id, rack_link_id, cams)
+        source_pts_mean = np.mean(source_obj_pcd_obs, axis=0)
+        inliers = np.where(np.linalg.norm(source_obj_pcd_obs - source_pts_mean, 2, 1) < 0.15)[0]
+        source_obj_pcd_obs = source_obj_pcd_obs[inliers]
 
         if obj_class == 'mug':
             rack_color = p.getVisualShapeData(table_id)[rack_link_id][7]
             show_link(table_id, rack_link_id, rack_color)
+
+        # Set demo info: For the NDF optimizer, we need to give an information of these two items
+        rack_target_info = {
+        'demo_query_pts':place_optimizer_pts,
+        'demo_obj_pts':target_obj_pcd_obs,
+        }
+
+        single_target = []
+        single_target.append(rack_target_info)
+
+        # demo_shapenet_ids.append(shapenet_id)
+        new_place_optimizer.set_demo_info(single_target)
 
         # optimize placement pose [same as with NDF]. Here: query points are pcd of object in source pose
         # rack_relative_pose is the transform which will bring source mug to target pose
@@ -530,14 +556,32 @@ def main(args, global_dict):
         # For now position is just a hard-coded grasp point which is offset by 0.05 in Y and 0.075 in Z
         # Orientation is for now hard-coded to be a 45 degree gripper orientation about Z.
         # Both position & orientation should come from VGN
-        ee_end_pose = [0,0,0,0,0,0,0]
-        ee_end_pose[0] = obj_pose_world_target[0][0]
-        ee_end_pose[1] = obj_pose_world_target[0][1] - 0.05
-        ee_end_pose[2] = obj_pose_world_target[0][2] + 0.07
-        ee_end_pose[3] = np.pi
-        ee_end_pose[4] = 0
-        ee_end_pose[5] = 0.3827
-        ee_end_pose[6] = 0.9238
+        if (obj_class == 'mug'):
+            ee_end_pose = [0,0,0,0,0,0,0]
+            ee_end_pose[0] = obj_pose_world_target[0][0]
+            ee_end_pose[1] = obj_pose_world_target[0][1] - 0.05
+            ee_end_pose[2] = obj_pose_world_target[0][2] + 0.07
+            ee_end_pose[3] = np.pi
+            ee_end_pose[4] = 0
+            ee_end_pose[5] = 0.3827
+            ee_end_pose[6] = 0.9238
+
+        elif(obj_class == 'bowl'):
+            ee_end_pose = [0,0,0,0,0,0,0]
+            ee_end_pose[0] = obj_pose_world_target[0][0]
+            ee_end_pose[1] = obj_pose_world_target[0][1] - 0.03
+            ee_end_pose[2] = obj_pose_world_target[0][2]
+            ee_end_pose[3] = np.pi #1.29931294
+            ee_end_pose[4] = 0
+            ee_end_pose[5] = 0.5
+            ee_end_pose[6] = 0
+            # ee_end_pose[3] = np.pi
+            # ee_end_pose[4] = 0
+            # ee_end_pose[5] = 0.3827
+            # ee_end_pose[6] = 0.9238
+        else:
+            raise NotImplementedError
+
 
         # Transform estimated grasp to source scene (it will be an inverse transform)
         ee_end_pose = util.list2pose_stamped(ee_end_pose)
@@ -634,6 +678,7 @@ def main(args, global_dict):
                         for i in range(p.getNumJoints(robot.arm.robot_id)):
                             safeCollisionFilterPair(bodyUniqueIdA=robot.arm.robot_id, bodyUniqueIdB=obj_id, linkIndexA=i, linkIndexB=-1, enableCollision=True, physicsClientId=robot.pb_client.get_client_id())
                             safeCollisionFilterPair(bodyUniqueIdA=robot.arm.robot_id, bodyUniqueIdB=table_id, linkIndexA=i, linkIndexB=rack_link_id, enableCollision=False, physicsClientId=robot.pb_client.get_client_id())
+                            safeCollisionFilterPair(bodyUniqueIdA=robot.arm.robot_id, bodyUniqueIdB=table_id, linkIndexA=i, linkIndexB=shelf_link_id, enableCollision=False, physicsClientId=robot.pb_client.get_client_id())
 
                         time.sleep(0.8)
                         obj_pos_before_grasp = p.getBasePositionAndOrientation(obj_id)[0]
@@ -670,6 +715,7 @@ def main(args, global_dict):
                         # turn OFF collisions between object / table and object / rack, and move to pre-place pose
                         safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=False)
                         safeCollisionFilterPair(obj_id, table_id, -1, rack_link_id, enableCollision=False)
+                        safeCollisionFilterPair(obj_id, table_id, -1, shelf_link_id, enableCollision=False)
                         time.sleep(1.0)
 
         if grasp_success:
@@ -697,6 +743,7 @@ def main(args, global_dict):
                     # turn ON collisions between object and rack, and open fingers
                     safeCollisionFilterPair(obj_id, table_id, -1, -1, enableCollision=True)
                     safeCollisionFilterPair(obj_id, table_id, -1, rack_link_id, enableCollision=True)
+                    safeCollisionFilterPair(obj_id, table_id, -1, shelf_link_id, enableCollision=True)
 
                     for jnt in plan3:
                         robot.arm.set_jpos(jnt, wait=False)
